@@ -1,0 +1,54 @@
+backend/
+├── src/
+│   ├── config/
+│   │   ├── database.ts           # MongoDB connection
+│   │   ├── langchain.ts          # LLM models setup
+│   │   ├── storage.ts            # Cloudinary config
+│   │   └── env.ts                # Environment variables
+│   │
+│   ├── models/
+│   │   ├── User.ts               # User schema
+│   │   ├── Resume.ts             # Resume schema
+│   │   └── Tenant.ts             # University/tenant schema
+│   │
+│   ├── services/
+│   │   ├── ai.service.ts         # LangChain logic
+│   │   ├── resume.service.ts    # Resume business logic
+│   │   ├── storage.service.ts   # File upload/download
+│   │   ├── pdf.service.ts       # PDF text extraction
+│   │   └── analytics.service.ts # Aggregations
+│   │
+│   ├── controllers/
+│   │   ├── auth.controller.ts   # Login/register
+│   │   ├── resume.controller.ts # Resume CRUD
+│   │   └── analytics.controller.ts
+│   │
+│   ├── routes/
+│   │   ├── auth.routes.ts
+│   │   ├── resume.routes.ts
+│   │   └── analytics.routes.ts
+│   │
+│   ├── middlewares/
+│   │   ├── auth.middleware.ts   # JWT verification
+│   │   ├── upload.middleware.ts # Multer config
+│   │   ├── error.middleware.ts  # Error handler
+│   │   └── validate.middleware.ts # Request validation
+│   │
+│   ├── utils/
+│   │   ├── jwt.ts               # Token generation
+│   │   ├── logger.ts            # Logging utility
+│   │   └── errors.ts            # Custom error classes
+│   │
+│   ├── types/
+│   │   ├── express.d.ts         # Express type extensions
+│   │   └── resume.types.ts      # Resume interfaces
+│   │
+│   └── server.ts                # App entry point
+│
+├── uploads/                     # Temporary upload folder
+├── .env.example
+├── .env
+├── .gitignore
+├── package.json
+├── tsconfig.json
+└── README.md
