@@ -13,6 +13,9 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "dependencies": {
     "@langchain/core": "^0.3.78",
     "@langchain/google-genai": "^0.2.18",

@@ -3,6 +3,7 @@ import Resume from "../models/Resume.js";
 import { analyzeResume } from "../services/ai.service.js";
 import { extractTextFromPDF } from "../utils/pdf.js";
 import { uploadPDF } from "../services/storage.service.js";
+import { ensureMongoDBConnection } from "../config/mongodb.js";
 import path from "path";
 import fs from "fs/promises";
 
@@ -17,6 +18,15 @@ declare module "express" {
 
 export const createAnalyis = async (req: Request, res: Response) => {
   try {
+    // Ensure MongoDB connection before proceeding
+    const isConnected = await ensureMongoDBConnection();
+    if (!isConnected) {
+      return res.status(503).json({
+        success: false,
+        error: "Database connection failed. Please try again later.",
+      });
+    }
+
     const { companyName, jobTitle, jobDescription, userId, tenantId } =
       req.body;
 
@@ -28,17 +38,22 @@ export const createAnalyis = async (req: Request, res: Response) => {
       return res.status(400).json({ error: "Resume file required" });
     }
 
-    const absolutePath = path.resolve(file.path);
-    console.log("Processing file:", absolutePath);
-
-    const resumeText = await extractTextFromPDF(absolutePath);
-    const { pdfUrl: resumePath, thumbnailUrl: imagePath } = await uploadPDF(
-      absolutePath,
-      false
+    console.log(
+      "Processing file in memory:",
+      file.originalname,
+      "size:",
+      file.size
     );
 
-    await fs.unlink(absolutePath);
-    console.log("Temp file deleted");
+    // Use buffer directly instead of file path
+    const resumeText = await extractTextFromPDF(file.buffer);
+    const { pdfUrl: resumePath, thumbnailUrl: imagePath } = await uploadPDF(
+      file.buffer,
+      file.originalname
+    );
+
+    // No need to delete temp file since we're using memory storage
+    console.log("File processed from memory");
 
     const { feedback, metadata } = await analyzeResume({
       resumeText,
@@ -80,6 +95,15 @@ export const createAnalyis = async (req: Request, res: Response) => {
 
 export const getResumes = async (req: Request, res: Response) => {
   try {
+    // Ensure MongoDB connection before proceeding
+    const isConnected = await ensureMongoDBConnection();
+    if (!isConnected) {
+      return res.status(503).json({
+        success: false,
+        error: "Database connection failed. Please try again later.",
+      });
+    }
+
     const { userId } = req.params;
     console.log("Getting resume by  user id", userId);
     const resumes = await Resume.find({ userId }).sort({ createdAt: -1 });
@@ -93,6 +117,15 @@ export const getResumes = async (req: Request, res: Response) => {
 
 export const getResumeById = async (req: Request, res: Response) => {
   try {
+    // Ensure MongoDB connection before proceeding
+    const isConnected = await ensureMongoDBConnection();
+    if (!isConnected) {
+      return res.status(503).json({
+        success: false,
+        error: "Database connection failed. Please try again later.",
+      });
+    }
+
     const { userId, id } = req.params;
     const resume = await Resume.findOne({
       _id: id,
