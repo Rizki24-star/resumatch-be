@@ -1,14 +1,14 @@
-import { PDFParse } from "pdf-parse";
-import { readFile } from "node:fs/promises";
-
-export const extractTextFromPDF = async (filePath: string): Promise<string> => {
+// PDF parsing disabled for serverless deployment to avoid DOM dependencies
+export const extractTextFromPDF = async (
+  input: string | Buffer
+): Promise<string> => {
   try {
-    const buffer = await readFile(filePath);
-    const parser = new PDFParse({ data: buffer });
-    const textResult = await parser.getText();
-    return textResult.text;
+    console.log(
+      "PDF parsing temporarily disabled for serverless compatibility - using stub response"
+    );
+    return "PDF text extraction is currently disabled in serverless environment. Please use local development for full functionality.";
   } catch (error) {
-    console.error("Error extracting text from PDF:", error);
+    console.error("Error in PDF extraction stub:", error);
     throw new Error("Failed to extract text from PDF");
   }
 };

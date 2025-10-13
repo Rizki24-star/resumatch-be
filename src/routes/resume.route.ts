@@ -7,8 +7,11 @@ const router: Router = Router();
 
 router.use(authenticate);
 
-// setup multer
-const upload = multer({ dest: "uploads/" });
+// setup multer for serverless environment (memory storage)
+console.log(
+  "Setting up multer with memory storage for serverless compatibility"
+);
+const upload = multer({ storage: multer.memoryStorage() });
 
 router.get("/:userId", resumeController.getResumes);
 router.post(

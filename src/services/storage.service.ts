@@ -38,35 +38,59 @@ export async function uploadFile(
 }
 
 export async function uploadPDF(
-  filePath: string,
-  deleteAfter: boolean = true
+  input: string | Buffer,
+  filename?: string
 ): Promise<{
   pdfUrl: string;
   thumbnailUrl: string;
 }> {
   try {
-    const absolutePath = path.isAbsolute(filePath)
-      ? filePath
-      : path.resolve(process.cwd(), filePath);
+    let buffer: Buffer;
+    let publicId: string;
 
-    await fs.access(absolutePath);
+    if (typeof input === "string") {
+      // Legacy support for file paths
+      const absolutePath = path.isAbsolute(input)
+        ? input
+        : path.resolve(process.cwd(), input);
+
+      await fs.access(absolutePath);
+      buffer = await fs.readFile(absolutePath);
+      publicId = path.basename(input, path.extname(input));
+    } else {
+      // Direct buffer support for serverless
+      buffer = input;
+      publicId = filename
+        ? path.basename(filename, path.extname(filename))
+        : "resume";
+    }
+
+    console.log("Uploading PDF buffer, size:", buffer.length);
 
     // Upload as raw for download
-    const rawResult = await cloudinary.uploader.upload(absolutePath, {
-      folder: `resume-analyzer/resume`,
-      resource_type: "raw",
-      use_filename: true,
-      unique_filename: true,
-    });
+    const rawResult = await cloudinary.uploader.upload(
+      `data:application/pdf;base64,${buffer.toString("base64")}`,
+      {
+        folder: `resume-analyzer/resume`,
+        resource_type: "raw",
+        public_id: publicId,
+        use_filename: false,
+        unique_filename: true,
+      }
+    );
 
     // Upload as image for thumbnail generation
-    const imageResult = await cloudinary.uploader.upload(absolutePath, {
-      folder: `resume-analyzer/resume/thumbnails`,
-      resource_type: "image",
-      format: "pdf",
-      use_filename: true,
-      unique_filename: true,
-    });
+    const imageResult = await cloudinary.uploader.upload(
+      `data:application/pdf;base64,${buffer.toString("base64")}`,
+      {
+        folder: `resume-analyzer/resume/thumbnails`,
+        resource_type: "image",
+        format: "pdf",
+        public_id: publicId,
+        use_filename: false,
+        unique_filename: true,
+      }
+    );
 
     // Generate thumbnail
     const thumbnailUrl = cloudinary.url(imageResult.public_id, {
@@ -79,11 +103,7 @@ export async function uploadPDF(
       ],
     });
 
-    // Only delete if requested
-    if (deleteAfter) {
-      await fs.unlink(absolutePath);
-      console.log("Temp file deleted in uploadPDF");
-    }
+    console.log("PDF uploaded successfully to Cloudinary");
 
     return {
       pdfUrl: rawResult.secure_url,
