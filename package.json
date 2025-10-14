@@ -20,7 +20,7 @@
     "@langchain/core": "^0.3.78",
     "@langchain/google-genai": "^0.2.18",
     "bcryptjs": "^3.0.2",
-    "canvas": "^3.2.0",
+    "canvas-prebuilt": "2.0.0-alpha.14",
     "cloudinary": "^2.7.0",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
