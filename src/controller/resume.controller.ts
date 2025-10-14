@@ -1,11 +1,11 @@
 import { Request, Response } from "express";
 import Resume from "../models/Resume.js";
 import { analyzeResume } from "../services/ai.service.js";
-import { extractTextFromPDF } from "../utils/pdf.js";
 import { uploadPDF } from "../services/storage.service.js";
 import { ensureMongoDBConnection } from "../config/mongodb.js";
-import path from "path";
-import fs from "fs/promises";
+import * as pdfjslib from "pdfjs-dist/legacy/build/pdf.mjs";
+import { TextItem } from "pdfjs-dist/types/src/display/api.js";
+import { formatTextContent } from "../utils/pdf.js";
 
 declare module "express" {
   interface Request {
@@ -32,6 +32,8 @@ export const createAnalyis = async (req: Request, res: Response) => {
 
     console.log("Request analysis: ", req.body);
 
+    const preserveFormatting = true;
+
     const file = req.file;
 
     if (!file) {
@@ -45,8 +47,48 @@ export const createAnalyis = async (req: Request, res: Response) => {
       file.size
     );
 
-    // Use buffer directly instead of file path
-    const resumeText = await extractTextFromPDF(file.buffer);
+    const data = file instanceof Buffer ? new Uint8Array(file) : file.buffer;
+
+    console.log("Processing file in memory:", file.buffer);
+    const loadingTask = pdfjslib.getDocument({
+      data: new Uint8Array(file.buffer),
+      useSystemFonts: true,
+      useWorkerFetch: false,
+      isEvalSupported: false,
+      maxImageSize: 1024 * 1024 * 20,
+    });
+
+    const pdfDocument = await loadingTask.promise;
+    const numPages = Math.min(pdfDocument.numPages, 5 /* max pages */);
+
+    const textPages: string[] = [];
+
+    let pageText = "";
+    console.log("Staring extraction");
+    // Extract text from each page
+    for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+      const page = await pdfDocument.getPage(pageNum);
+      const textContent = await page.getTextContent();
+
+      if (preserveFormatting) {
+        // Preserve approximate layout
+        pageText = formatTextContent(textContent.items as TextItem[]);
+        textPages.push(pageText);
+      } else {
+        // Simple concatenation
+        const pageText = textContent.items
+          .map((item: any) => item.str)
+          .join(" ");
+        textPages.push(pageText);
+      }
+
+      // Clean up page resources
+      page.cleanup();
+    }
+
+    console.log("Starting uploading...");
+    // // Use buffer directly instead of file path
+    // const resumeText = await extractTextFromPDF(file.buffer);
     const { pdfUrl: resumePath, thumbnailUrl: imagePath } = await uploadPDF(
       file.buffer,
       file.originalname
@@ -56,7 +98,7 @@ export const createAnalyis = async (req: Request, res: Response) => {
     console.log("File processed from memory");
 
     const { feedback, metadata } = await analyzeResume({
-      resumeText,
+      resumeText: pageText,
       jobTitle,
       jobDescription,
     });
