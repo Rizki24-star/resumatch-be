@@ -1,129 +1,4 @@
-import { TextItem } from "pdfjs-dist/types/src/display/api";
-
-// Lazy load pdfjs setelah polyfill
-let pdfjsLib: any = null;
-
-// Define polyfill classes at module level
-class ImageDataPolyfill {
-  width: number;
-  height: number;
-  data: Uint8ClampedArray;
-  constructor(
-    widthOrData: number | Uint8ClampedArray,
-    heightOrWidth?: number,
-    settings?: any
-  ) {
-    if (widthOrData instanceof Uint8ClampedArray) {
-      this.data = widthOrData;
-      this.width = heightOrWidth!;
-      this.height = widthOrData.length / (4 * heightOrWidth!);
-    } else {
-      this.width = widthOrData;
-      this.height = heightOrWidth!;
-      this.data = new Uint8ClampedArray(widthOrData * heightOrWidth! * 4);
-    }
-  }
-}
-
-// Minimal polyfill - hanya untuk text extraction
-function setupPolyfills() {
-  if (typeof globalThis.DOMMatrix === "undefined") {
-    class DOMMatrixPolyfill {
-      a = 1;
-      b = 0;
-      c = 0;
-      d = 1;
-      e = 0;
-      f = 0;
-      constructor(init?: number[] | string) {
-        if (Array.isArray(init) && init.length >= 6) {
-          [this.a, this.b, this.c, this.d, this.e, this.f] = init;
-        }
-      }
-    }
-    (globalThis as any).DOMMatrix = DOMMatrixPolyfill;
-  }
-
-  if (typeof globalThis.Path2D === "undefined") {
-    class Path2DPolyfill {
-      moveTo() {}
-      lineTo() {}
-      bezierCurveTo() {}
-      quadraticCurveTo() {}
-      arc() {}
-      arcTo() {}
-      ellipse() {}
-      rect() {}
-      closePath() {}
-    }
-    (globalThis as any).Path2D = Path2DPolyfill;
-  }
-
-  if (typeof globalThis.ImageData === "undefined") {
-    (globalThis as any).ImageData = ImageDataPolyfill;
-  }
-
-  if (typeof globalThis.OffscreenCanvas === "undefined") {
-    class OffscreenCanvasPolyfill {
-      width: number;
-      height: number;
-      constructor(width: number, height: number) {
-        this.width = width;
-        this.height = height;
-      }
-      getContext() {
-        // Return minimal context for text extraction
-        return {
-          canvas: this,
-          fillStyle: "",
-          strokeStyle: "",
-          fillRect() {},
-          strokeRect() {},
-          clearRect() {},
-          fillText() {},
-          strokeText() {},
-          measureText() {
-            return { width: 0 };
-          },
-          save() {},
-          restore() {},
-          scale() {},
-          rotate() {},
-          translate() {},
-          transform() {},
-          setTransform() {},
-          resetTransform() {},
-          drawImage() {},
-          createImageData: (w: number, h: number) =>
-            new ImageDataPolyfill(w, h),
-          getImageData: (x: number, y: number, w: number, h: number) =>
-            new ImageDataPolyfill(w, h),
-          putImageData() {},
-        };
-      }
-      convertToBlob() {
-        return Promise.resolve(new Blob());
-      }
-    }
-    (globalThis as any).OffscreenCanvas = OffscreenCanvasPolyfill;
-  }
-}
-
-async function loadPdfJs() {
-  if (!pdfjsLib) {
-    setupPolyfills();
-    const pdfjs = await import("pdfjs-dist");
-
-    // Handle both default and named exports
-    pdfjsLib = pdfjs.default || pdfjs;
-
-    // Disable worker for Node.js/serverless environments
-    if (pdfjsLib.GlobalWorkerOptions) {
-      pdfjsLib.GlobalWorkerOptions.workerSrc = null;
-    }
-  }
-  return pdfjsLib;
-}
+import PDFParser from "pdf2json";
 
 export interface ExtractTextOptions {
   maxPages?: number;
@@ -131,87 +6,70 @@ export interface ExtractTextOptions {
 }
 
 /**
- * Extracts text from PDF buffer
+ * Extracts text from PDF buffer using pdf2json (serverless compatible)
  */
 export async function extractTextFromPDF(
   buffer: Buffer,
   options: ExtractTextOptions = {}
 ): Promise<string> {
-  const { maxPages = Infinity, preserveFormatting = true } = options;
+  const { maxPages = Infinity } = options;
 
-  try {
-    const pdfjs = await loadPdfJs();
-    const data = new Uint8Array(buffer);
+  return new Promise((resolve, reject) => {
+    const pdfParser = new PDFParser();
 
-    const loadingTask = pdfjs.getDocument({
-      data,
-      useSystemFonts: true,
-      useWorkerFetch: false,
-      isEvalSupported: false,
-      disableFontFace: true,
-      disableWorker: true,
-      standardFontDataUrl: undefined,
-      maxImageSize: 1024 * 1024 * 20,
+    pdfParser.on("pdfParser_dataError", (errData: any) => {
+      console.error("PDF parsing error:", errData.parserError);
+      reject(new Error(`Failed to parse PDF: ${errData.parserError}`));
     });
 
-    const pdfDocument = await loadingTask.promise;
-    const numPages = Math.min(pdfDocument.numPages, maxPages);
-    const textPages: string[] = [];
+    pdfParser.on("pdfParser_dataReady", (pdfData: any) => {
+      try {
+        const pages = pdfData.Pages || [];
+        const numPages = Math.min(pages.length, maxPages);
+        const textPages: string[] = [];
 
-    for (let pageNum = 1; pageNum <= numPages; pageNum++) {
-      const page = await pdfDocument.getPage(pageNum);
-      const textContent = await page.getTextContent();
+        for (let i = 0; i < numPages; i++) {
+          const page = pages[i];
+          const texts = page.Texts || [];
 
-      let pageText: string;
-      if (preserveFormatting) {
-        pageText = formatTextContent(textContent.items as TextItem[]);
-      } else {
-        pageText = textContent.items.map((item: any) => item.str).join(" ");
+          // Extract text from each text element
+          const pageText = texts
+            .map((text: any) => {
+              try {
+                // Decode URI-encoded text
+                return decodeURIComponent(text.R?.[0]?.T || "");
+              } catch (decodeError) {
+                // If decoding fails, return the raw text
+                console.warn(
+                  "Failed to decode URI text, using raw text:",
+                  decodeError
+                );
+                return text.R?.[0]?.T || "";
+              }
+            })
+            .filter((t: string) => t.trim().length > 0)
+            .join(" ");
+
+          textPages.push(pageText);
+        }
+
+        const fullText = textPages.join("\n\n--- Page Break ---\n\n");
+        resolve(fullText);
+      } catch (error) {
+        console.error("PDF text extraction error:", error);
+        reject(
+          new Error(
+            `Failed to extract text from PDF: ${
+              error instanceof Error ? error.message : "Unknown error"
+            }`
+          )
+        );
       }
+    });
 
-      textPages.push(pageText);
-      page.cleanup();
-    }
-
-    await pdfDocument.destroy();
-    return textPages.join("\n\n--- Page Break ---\n\n");
-  } catch (error) {
-    console.error("PDF extraction error:", error);
-    throw new Error(
-      `Failed to extract text from PDF: ${
-        error instanceof Error ? error.message : "Unknown error"
-      }`
-    );
-  }
-}
-
-/**
- * Format text content with approximate layout preservation
- */
-function formatTextContent(items: TextItem[]): string {
-  let lastY = -1;
-  let text = "";
-
-  items.forEach((item) => {
-    if ("transform" in item && Array.isArray(item.transform)) {
-      const currentY = item.transform[5];
-
-      if (lastY !== -1 && Math.abs(currentY - lastY) > 5) {
-        text += "\n";
-      }
-
-      text += item.str;
-      lastY = currentY;
-
-      if (item.str && !item.str.match(/[.,:;!?\-\s]$/)) {
-        text += " ";
-      }
-    } else {
-      text += item.str + " ";
-    }
+    // Parse the PDF buffer
+    pdfParser.parseBuffer(buffer);
   });
-
-  return text.trim();
 }
 
 /**
@@ -222,40 +80,44 @@ export function isValidPDF(buffer: Buffer): boolean {
 }
 
 /**
- * Get PDF metadata
+ * Get PDF metadata using pdf2json
  */
 export async function getPDFMetadata(buffer: Buffer): Promise<{
   numPages: number;
   info: any;
   metadata: any;
 }> {
-  try {
-    const pdfjs = await loadPdfJs();
-    const data = new Uint8Array(buffer);
+  return new Promise((resolve, reject) => {
+    const pdfParser = new PDFParser();
 
-    const loadingTask = pdfjs.getDocument({
-      data,
-      useWorkerFetch: false,
-      disableFontFace: true,
-      disableWorker: true,
+    pdfParser.on("pdfParser_dataError", (errData: any) => {
+      reject(new Error(`Failed to get PDF metadata: ${errData.parserError}`));
     });
 
-    const pdfDocument = await loadingTask.promise;
-    const metadataResult = await pdfDocument.getMetadata();
+    pdfParser.on("pdfParser_dataReady", (pdfData: any) => {
+      try {
+        const result = {
+          numPages: pdfData.Pages?.length || 0,
+          info: {
+            Title: pdfData.Meta?.Title || "",
+            Author: pdfData.Meta?.Author || "",
+            Creator: pdfData.Meta?.Creator || "",
+            Producer: pdfData.Meta?.Producer || "",
+          },
+          metadata: pdfData.Meta || {},
+        };
+        resolve(result);
+      } catch (error) {
+        reject(
+          new Error(
+            `Failed to extract metadata: ${
+              error instanceof Error ? error.message : "Unknown error"
+            }`
+          )
+        );
+      }
+    });
 
-    const result = {
-      numPages: pdfDocument.numPages,
-      info: metadataResult.info,
-      metadata: metadataResult.metadata,
-    };
-
-    await pdfDocument.destroy();
-    return result;
-  } catch (error) {
-    throw new Error(
-      `Failed to get PDF metadata: ${
-        error instanceof Error ? error.message : "Unknown error"
-      }`
-    );
-  }
+    pdfParser.parseBuffer(buffer);
+  });
 }

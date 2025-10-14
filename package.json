@@ -35,7 +35,7 @@
     "mongoose": "^8.19.1",
     "morgan": "^1.10.1",
     "multer": "^2.0.2",
-    "pdfjs-dist": "3.11.174",
+    "pdf2json": "^4.0.0",
     "tsc-alias": "^1.8.16",
     "typescript": "^5.9.3",
     "zod": "^4.1.12"
