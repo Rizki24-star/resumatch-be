@@ -112,9 +112,15 @@ function setupPolyfills() {
 async function loadPdfJs() {
   if (!pdfjsLib) {
     setupPolyfills();
-    pdfjsLib = await import("pdfjs-dist/legacy/build/pdf");
-    // Set empty worker for text-only extraction
-    pdfjsLib.GlobalWorkerOptions.workerSrc = "";
+    const pdfjs = await import("pdfjs-dist");
+
+    // Handle both default and named exports
+    pdfjsLib = pdfjs.default || pdfjs;
+
+    // Disable worker for Node.js/serverless environments
+    if (pdfjsLib.GlobalWorkerOptions) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = null;
+    }
   }
   return pdfjsLib;
 }
@@ -143,10 +149,9 @@ export async function extractTextFromPDF(
       useWorkerFetch: false,
       isEvalSupported: false,
       disableFontFace: true,
+      disableWorker: true,
       standardFontDataUrl: undefined,
       maxImageSize: 1024 * 1024 * 20,
-      // Explicitly disable worker
-      disableWorker: true,
     });
 
     const pdfDocument = await loadingTask.promise;
