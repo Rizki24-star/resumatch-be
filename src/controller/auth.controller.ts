@@ -5,6 +5,15 @@ import { AuthRequest } from "../middleware/auth.middleware.js";
 
 export const googleAuth = async (req: Request, res: Response) => {
   try {
+    const { ensureMongoDBConnection } = await import("../config/mongodb.js");
+    const connected = await ensureMongoDBConnection();
+    if (!connected) {
+      return res.status(500).json({
+        success: false,
+        error: "Database connection failed",
+      });
+    }
+
     const { email, name, picture, googleId } = req.body;
 
     // Validation
