@@ -26,7 +26,6 @@
     "@types/multer": "^2.0.0",
     "@types/node": "^24.7.0",
     "bcryptjs": "^3.0.2",
-    "canvas-prebuilt": "2.0.0-alpha.14",
     "cloudinary": "^2.7.0",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
