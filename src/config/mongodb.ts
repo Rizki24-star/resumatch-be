@@ -36,7 +36,7 @@ export const connectMongoDB = async (): Promise<boolean> => {
       family: 4, // Use IPv4, skip trying IPv6
       retryWrites: false, // Disable retries for serverless
       retryReads: false, // Disable retries for serverless
-      connectTimeoutMS: 10000, // Connection timeout
+      connectTimeoutMS: 30000, // Connection timeout
     };
 
     console.log("Connection options:", options);
