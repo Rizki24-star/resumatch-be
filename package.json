@@ -36,7 +36,6 @@
     "mongoose": "^8.19.1",
     "morgan": "^1.10.1",
     "multer": "^2.0.2",
-    "pdf-parse": "^2.2.2",
     "pdfjs-dist": "3.11.174",
     "tsc-alias": "^1.8.16",
     "typescript": "^5.9.3",
