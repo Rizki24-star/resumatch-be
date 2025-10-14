@@ -17,8 +17,11 @@ router.get("/:userId", resumeController.getResumes);
 router.post(
   "/analyze",
   upload.single("resume"),
-  resumeController.createAnalyis
+  resumeController.createAnalysis
 );
+
+router.post("/:userId/:id/delete", resumeController.deleteResume);
+
 router.get("/:userId/:id", resumeController.getResumeById);
 
 export default router;

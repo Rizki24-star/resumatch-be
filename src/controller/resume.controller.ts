@@ -14,7 +14,7 @@ declare module "express" {
   }
 }
 
-export const createAnalyis = async (req: Request, res: Response) => {
+export const createAnalysis = async (req: Request, res: Response) => {
   try {
     const isConnected = await ensureMongoDBConnection();
     if (!isConnected) {
@@ -152,6 +152,36 @@ export const getResumeById = async (req: Request, res: Response) => {
     res.json({ success: true, data: resume });
   } catch (error: any) {
     console.error("Failed to get resume:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message || "Failed to retrieve resume",
+    });
+  }
+};
+
+export const deleteResume = async (req: Request, res: Response) => {
+  try {
+    const isConnected = await ensureMongoDBConnection();
+    if (!isConnected) {
+      return res.status(503).json({
+        success: false,
+        error: "Database connection failed. Please try again later.",
+      });
+    }
+
+    const { id, userId } = req.params;
+    const resume = await Resume.findOneAndDelete({ _id: id, userId });
+
+    if (!resume) {
+      return res.status(404).json({
+        success: false,
+        error: "Resume not found.",
+      });
+    }
+
+    res.json({ success: true, data: "Resume deleted successfully" });
+  } catch (error: any) {
+    console.error("Error deleting resume:", error);
     res.status(500).json({
       success: false,
       error: error.message || "Failed to retrieve resume",
